@@ -1,0 +1,12 @@
+{
+  "name": "25_100_25_smoothstep",
+  "source_fps": 100,
+  "keyframes": [
+    { "time_sec": 0.0, "target_fps": 25 },
+    { "time_sec": 1.5, "target_fps": 100 },
+    { "time_sec": 3.0, "target_fps": 100 },
+    { "time_sec": 4.5, "target_fps": 25 }
+  ],
+  "interpolation": "smoothstep",
+  "total_duration_sec": 4.5
+}

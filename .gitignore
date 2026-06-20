@@ -1,0 +1,85 @@
+# =============================================================
+# framerate-ramp-pipeline — .gitignore
+# =============================================================
+
+# ---------------- Videomaterial & generierte Frames ----------
+# Diese Ordner enthalten Gigabytes an Bilddaten und ggf.
+# urheberrechtlich geschuetztes Quellmaterial. Sie bleiben
+# ausschliesslich lokal.
+data/source_100fps/
+data/interim/
+data/output/
+
+# Einzelne Frame-Sequenzen falls ausserhalb von data/ abgelegt
+*.png
+*.exr
+*.dpx
+*.tiff
+*.tif
+
+# Videodateien
+*.mov
+*.mp4
+*.mxf
+*.avi
+*.mkv
+*.mts
+*.r3d
+*.braw
+
+# ---------------- Python-Umgebung & Cache --------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---------------- Jupyter Notebook Checkpoints ---------------
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# ---------------- RIFE-Modell-Weights ------------------------
+# Die *.pkl-Dateien der RIFE-Checkpoints sind zu gross fuer Git
+# und muessen vom Nutzer separat heruntergeladen werden.
+third_party/practical-rife/train_log/*.pkl
+third_party/practical-rife/train_log/*.pth
+third_party/practical-rife/train_log/*.pt
+
+# Das RIFE-Repo selbst ist als Submodule referenziert, nicht
+# direkt versioniert -- aber falls doch geklont:
+third_party/practical-rife/__pycache__/
+third_party/practical-rife/train_log/__pycache__/
+
+# ---------------- Render-Fingerprints (lokal) ----------------
+# Werden automatisch generiert und sind maschinenspezifisch.
+.render_fingerprint.json
+
+# ---------------- Betriebssystem & Editor --------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains
+.idea/
+
+# ---------------- Sonstiges ----------------------------------
+*.log
+*.tmp
+*.bak
+.env

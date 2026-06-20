@@ -52,6 +52,7 @@ Das neuronale Netz **Practical-RIFE** (Real-Time Intermediate Flow Estimation) g
 ```
 framerate-ramp-pipeline/
 ├── config/ramp_presets/        # Ramp-Kurven als JSON (editierbar)
+├── docs/
 ├── data/
 │   ├── source_100fps/          # Quellmaterial (read-only)
 │   ├── interim/                # Timing-Tabellen, gerenderte Frames, Plots
@@ -245,7 +246,7 @@ Zeigt direkt die physikalische Bedeutung der Ramp: Wie viele 100fps-Quell-Frames
 *Panel 1 zeigt die 1:1-Diagonale (konstante Zeitachse). Panel 3 zeigt die Blur-Fensterbreite (4 Quell-Frames bei 25fps-Charakter, 1 Frame bei 100fps-Charakter).*
 
 **Render-Preview (H.264 Web-Kompression):**
-https://github.com/Simo-de/framerate-ramp-pipeline/raw/main/docs/preview_motion_grade.mp4
+[Preview ansehen (MP4, ~10MB)](https://github.com/Simo-de/framerate-ramp-pipeline/raw/main/docs/preview_motion_grade.mp4)
 ---
 
 ## Literaturgrundlage

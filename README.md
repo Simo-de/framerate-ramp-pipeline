@@ -245,9 +245,6 @@ Zeigt direkt die physikalische Bedeutung der Ramp: Wie viele 100fps-Quell-Frames
 ![Verifikationsplot](docs/verification_plot.png)
 *Panel 1 zeigt die 1:1-Diagonale (konstante Zeitachse). Panel 3 zeigt die Blur-Fensterbreite (4 Quell-Frames bei 25fps-Charakter, 1 Frame bei 100fps-Charakter).*
 
-**Render-Preview (H.264 Web-Kompression):**
-[Preview ansehen (MP4, ~10MB)](https://github.com/Simo-de/framerate-ramp-pipeline/raw/main/docs/preview_motion_grade.mp4)
----
 
 ## Literaturgrundlage
 

@@ -72,7 +72,7 @@ def plot_frame_mapping(ax: plt.Axes, df: pd.DataFrame) -> None:
         )
 
     ax.set_xlabel("Output-Frame-Index")
-    ax.set_title(f"1) Frame-Mapping  [{mode}]")
+    ax.set_title("Frame-Mapping")
     ax.grid(True, alpha=0.3)
 
 
@@ -112,18 +112,18 @@ def plot_effective_framerate(fig: plt.Figure, axes: list[plt.Axes], df: pd.DataF
 
     ax_fps.plot(t, fps, color="#16a34a", linewidth=1.8)
     ax_fps.set_ylabel("lokale Ziel-FPS")
-    ax_fps.set_title(f"2a) Effective Framerate Curve  [{mode}]")
+    ax_fps.set_title("Ziel-Framerate")
     ax_fps.grid(True, alpha=0.3)
 
     ax_d1.plot(t_first, first_deriv, color="#d97706", linewidth=1.2)
     ax_d1.set_ylabel("d(fps)/dt")
-    ax_d1.set_title("2b) Erste Ableitung")
+    ax_d1.set_title("Erste Ableitung")
     ax_d1.grid(True, alpha=0.3)
     ax_d1.axhline(0, color="#999999", linewidth=0.8)
 
     ax_d2.plot(t_second, second_deriv, color="#dc2626", linewidth=1.0)
     ax_d2.set_ylabel("d²(fps)/dt²")
-    ax_d2.set_title("2c) Zweite Ableitung — darf hoch sein, muss aber glatt sein")
+    ax_d2.set_title("Zweite Ableitung")
     ax_d2.grid(True, alpha=0.3)
     ax_d2.axhline(0, color="#999999", linewidth=0.8)
 
@@ -139,13 +139,9 @@ def plot_effective_framerate(fig: plt.Figure, axes: list[plt.Axes], df: pd.DataF
             ax_d3.legend(loc="upper right", fontsize=8)
     ax_d3.set_ylabel("d³(fps)/dt³")
     ax_d3.set_xlabel("Output-Zeit (s)")
-    ax_d3.set_title("2d) Ruck — STUFENLOSIGKEITS-BEWEIS (rote Punkte = echter Sprung)")
+    ax_d3.set_title("Dritte Ableitung")
     ax_d3.grid(True, alpha=0.3)
     ax_d3.axhline(0, color="#999999", linewidth=0.8)
-    ax_d3.annotate(
-        f"Spike-Schwelle: {25.0 if mode == 'motion_grade' else 8.0}× Median",
-        xy=(0.02, 0.92), xycoords="axes fraction", fontsize=8, color="#555555",
-    )
 
 
 def plot_timestep_sanity(ax: plt.Axes, df: pd.DataFrame) -> None:
@@ -163,7 +159,7 @@ def plot_timestep_sanity(ax: plt.Axes, df: pd.DataFrame) -> None:
         ax.axhspan(1.0, 1.05, color="#dc2626", alpha=0.15)
         ax.set_ylim(-0.05, 1.05)
         ax.set_ylabel("RIFE-Timestep (Blend-Faktor)")
-        ax.set_title("3) Timestep-Sanity-Check (muss strikt in [0, 1) bleiben)")
+        ax.set_title("Timestep-Sanity-Check")
         ax.annotate(
             "rote Zone = ungültiger Bereich",
             xy=(0.02, 0.92), xycoords="axes fraction", fontsize=8, color="#555555",
@@ -178,7 +174,7 @@ def plot_timestep_sanity(ax: plt.Axes, df: pd.DataFrame) -> None:
                    label="4.0 = 25fps-Charakter (max. Blur bei 100fps Quelle)")
         ax.legend(loc="upper right", fontsize=8)
         ax.set_ylabel("Blur-Fensterbreite (Quell-Frames)")
-        ax.set_title("3) Blur-Fenster-Verlauf  [motion_grade]")
+        ax.set_title("Blur-Fenster-Verlauf")
         ax.annotate(
             "Breite = Anzahl der in jeden Output-Frame gefalteten Quell-Frames",
             xy=(0.02, 0.92), xycoords="axes fraction", fontsize=8, color="#555555",

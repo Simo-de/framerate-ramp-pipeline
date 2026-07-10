@@ -29,17 +29,19 @@ from src.ramp_curve import RampCurve
 
 class TimingTableBuilder:
     def __init__(
-        self,
-        ramp: RampCurve,
-        source_fps: float,
-        output_fps: float = 25.0,
-        mode: str = "motion_grade",
+    self,
+    ramp: RampCurve,
+    source_fps: float,
+    output_fps: float = 25.0,
+    mode: str = "motion_grade",
+    shutter_angle: float = 360.0, 
     ):
         if mode not in ("speedramp", "motion_grade"):
             raise ValueError(f"Unbekannter Modus: '{mode}'. Erlaubt: 'speedramp', 'motion_grade'.")
         self.ramp = ramp
         self.source_fps = source_fps
         self.mode = mode
+        self.shutter_angle = shutter_angle
         # Im motion_grade-Modus ist output_fps immer == source_fps.
         # Das ist der mathematische Kern des Fixes: 1 Input-Frame = 1 Output-Frame.
         self.output_fps = source_fps if mode == "motion_grade" else output_fps
@@ -121,12 +123,18 @@ class TimingTableBuilder:
         local_fps = np.clip(local_fps, 1.0, self.source_fps)
 
         # Blur-Fenstergröße in Quell-Frames (kann nicht-ganzzahlig sein)
-        blur_window = self.source_fps / local_fps  # z.B. 100/25 = 4.0
+        shutter_fraction = self.shutter_angle / 360.0
+        blur_window = (self.source_fps / local_fps) * shutter_fraction
+        # Beispiel: 100fps / 25fps * (180/360) = 4.0 * 0.5 = 2.0
+        # → nur 2 Quell-Frames werden gefaltet, nicht 4
+        # → hold_count bleibt 4 (Kadenz ändert sich nicht durch Shutter)
+        # hold_count = round(source_fps / local_fps)  -- KEIN Shutter-Faktor hier!
+        # blur_window = (source_fps / local_fps) * shutter_fraction  -- Shutter nur hier!
 
         # Hold-Count: wie viele Output-Frames zeigen diesen Blur-Composite?
         # Wir runden auf die naechste ganze Zahl. Das ist der Pulldown-
         # Kompromiss (keine halben Frames).
-        hold_count = np.clip(np.round(blur_window).astype(int), 1, int(self.source_fps))
+        hold_count = np.clip(np.round(self.source_fps / local_fps).astype(int), 1, int(self.source_fps))
 
         # Jetzt bauen wir die Output-Frame-Tabelle auf. Wir iterieren
         # durch Bloecke: jeder "Anker-Frame" definiert einen Blur-

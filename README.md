@@ -1,257 +1,271 @@
-# Motion Grading Pipeline
-### Framerate-Ramp-Processing für 100fps-Filmmaterial bei konstanter Zeitachse
+# framerate-ramp-pipeline
 
-**HDM Stuttgart — Masterprojekt Cinematography**
-Simon Hans · Betreuer: Jan Fröhlich, Stefan Grandinetti
+Eine Python-Pipeline für **Motion Grading** von 100fps-Filmmaterial: stufenlose Steuerung des Shutter-Charakters bei konstanter Zeitachse.
 
----
-
-## Transparenzhinweis zur Entwicklungsmethode
-
-Dieses Projekt wurde im Rahmen meines Masterprojekts an der HdM Stuttgart entwickelt. Für die Implementierung der Pipeline — d.h. die Generierung und das iterative Debugging des Python-Codes — habe ich intensiv mit dem Large Language Model Claude (Anthropic, Modell: Claude Sonnet 4.6) zusammengearbeitet. Sämtliche konzeptionellen Entscheidungen (Problemdefinition, Wahl der mathematischen Interpolationsmethode, visuelle Verifikationsstrategie usw.) wurden von mir  entwickelt und mit dem Modell diskutiert. Der Code entstand im Dialog, wurde von mir in jeder Iteration inhaltlich geprüft, gegen echtes Filmmaterial getestet und bei Fehlern gezielt korrigiert.
-
-Dieses Repository dokumentiert einen **funktionierenden Proof-of-Concept** an einem kurzen Testclip (~4 Sekunden, 100fps). Die Pipeline ist für den Einsatz auf dem vollständigen Kurzfilm-Quellmaterial (ca. 250 GB, 100fps) ausgelegt, wurde in dieser Gesamtskala aber noch nicht vollständig durchgeführt.
+HDM Stuttgart — Masterprojekt Cinematography Simon Hans · Betreuer: Jan Fröhlich, Stefan Grandinetti
 
 ---
 
-## Motivation & Problemstellung
+## Transparenzhinweis
 
-Ein harter Schnitt zwischen flüssigem 100fps-Material und klassischem 25fps-Look reißt den Zuschauer aus der Immersion. Der Sprung von gestochen scharfen, hochfrequenten Bewegungen (kurze Belichtungszeit) zu weichem, filmischem Motion Blur irritiert das Auge.
+Dieses Projekt wurde im Rahmen meines Masterprojekts an der HdM Stuttgart entwickelt. Für die Implementierung der Pipeline — d.h. die Generierung und das iterative Debugging des Python-Codes — habe ich intensiv mit dem Large Language Model Claude (Anthropic, Modell: Claude Sonnet 4.6) zusammengearbeitet. Sämtliche konzeptionellen Entscheidungen (Problemdefinition, Wahl der mathematischen Interpolationsmethode, visuelle Verifikationsstrategie usw.) wurden eigenständig entwickelt und im Dialog mit dem Modell umgesetzt. Der Code wurde in jeder Iteration inhaltlich geprüft und bei Fehlern gezielt korrigiert.
 
-Dieses Projekt löst das Problem durch Motion Grading. Die Pipeline verschleiert den Übergang zwischen HFR- und 25fps-Material, indem sie den Shutter-Charakter des Footage dynamisch und stufenlos anpasst, ohne die Abspielgeschwindigkeit zu verändern. Das Ergebnis ist ein unsichtbarer, natürlicher Wechsel – als würde die Kamera während der Einstellung fließend ihren Shutter-Winkel ändern.
-
-
-## Technischer Ansatz
-
-### Kernidee: Frame-Hold mit Blur-Compositing
-
-Da der Output-Container mit 100fps läuft, entspricht jeder Output-Frame genau einem Quell-Frame-Zeitpunkt (1:1-Mapping). Der Motion-Grading-Effekt entsteht durch zwei Mechanismen pro Output-Frame:
-
-1. Blur-Compositing (Shutter-Integral): Statt eines einzelnen scharfen Quell-Frames werden N RIFE-interpolierte Sub-Samples innerhalb eines virtuellen Shutter-Fensters gemittelt. Die Breite dieses Fensters (in Quell-Frames) ist `source_fps / local_target_fps`. Bei simulierten 25fps werden 4 Quell-Frames zu einem belichteten Composite gefaltet — physikalisch das Äquivalent eines 360°-Shutters bei 25fps.
-
-2. Frame-Hold (Update-Rate): Das Composite wird `hold_count`-mal wiederholt (z.B. 4× bei 25fps-Charakter). Dadurch „aktualisiert" sich der Bildinhalt nur mit der simulierten Framerate, während der Container durchgängig mit 100fps läuft.
-
-### Stufenlose Rampe
-
-Die Übergangsrampe zwischen den Framerate-Charakteren wird durch eine **Quintic-Smootherstep-Interpolation** (6x⁵ − 15x⁴ + 10x³) zwischen definierten Keyframes berechnet. Diese Funktion hat sowohl erste als auch zweite Ableitung exakt Null an den Segmenträndern — sie garantiert damit C²-Stetigkeit, was wahrnehmbare „Ruckel-im-Ruckel"-Effekte an Übergangspunkten verhindert.
-
-### Wissenschaftliche Grundlage der Implementierungsentscheidungen
-
-Oberhauser (2023) belegt, dass lineare Framerate-Rampen an den Übergängen spürbare Diskontinuitäten erzeugen (ein "Ruckeln im Ruckeln" zweiter Ordnung). Um dies zu verhindern, nutzt diese Pipeline eine Quintic Smootherstep-Interpolation ($6x^5 - 15x^4 + 10x^3$). Erste und zweite Ableitung sind an den Segmenträndern exakt null, was einen mathematisch und visuell nahtlosen C²-Übergang garantiert.
-
-Nach Hoydem (2021) entsteht wahrgenommener Judder primär durch die Diskrepanz zwischen implizierter Belichtungszeit (Motion Blur) und der tatsächlichen Frame-Haltezeit. Die Pipeline setzt diesen Befund praktisch um: Die Framerate-Kurve steuert ausschließlich die Shutter-Charakteristik. Die Zeitachse bleibt unangetastet, wodurch Abspielgeschwindigkeit und Bewegungsunschärfe als völlig unabhängige Dimensionen kontrolliert werden.
-
-### RIFE für Sub-Frame-Interpolation
-
-Das neuronale Netz **Practical-RIFE** (Real-Time Intermediate Flow Estimation) generiert die Sub-Frame-Interpolationen innerhalb jedes Shutter-Fensters. RIFE schätzt optische Flüsse zwischen je zwei Quell-Frames und generiert physikalisch korrekte Zwischenbilder bei beliebigen fraktionalen Timesteps — ohne das Ghosting-Artefakt eines simplen linearen Crossfades.
+Dieses Repository dokumentiert einen funktionierenden **Proof-of-Concept** an einem Testclip (~4 Sekunden, 100fps).
 
 ---
 
-## Ordnerstruktur
+## Was dieses Tool tut — und was nicht
+
+### Speedramping vs. Motion Grading
+
+Beim **Speedramping** steuert die Framerate-Kurve gleichzeitig zwei Dinge: die Wiedergabegeschwindigkeit *und* die Anzahl der Quell-Frames, die auf einen Output-Frame abgebildet werden. Ein Ramp von 100fps auf 25fps bedeutet dort, dass die Quellzeit viermal langsamer abläuft. Der Clip dehnt sich auf das Vierfache seiner Dauer.
+
+Beim **Motion Grading** (diese Pipeline) werden beide Aspekte getrennt. Die Zeitachse bleibt konstant bei 1×. Jeder Output-Frame entspricht exakt demselben Zeitpunkt im Quellmaterial. Was sich ändert, ist ausschließlich der Shutter-Charakter: Wie viele Quell-Frames werden zu einem Composite gefaltet, und wie oft wird dieses Bild im 100fps-Container wiederholt?
+
+| | Speedramping | Motion Grading (diese Pipeline) |
+|---|---|---|
+| Zeitachse | gedehnt / gestaucht | konstant 1× |
+| Output-Länge | ändert sich | identisch zum Original |
+| Container-FPS | niedriger (z.B. 25fps) | identisch zur Quelle (100fps) |
+| Effekt | Bewegung langsamer / schneller | Shutter-Charakter ändert sich |
+
+### Die Formel dahinter
+
+Sei `f_target` die lokale Ziel-Framerate, `f_source` die Quell-Framerate (100fps) und `shutter_angle` der gewünschte simulierte Shutter-Winkel in Grad:
 
 ```
-framerate-ramp-pipeline/
-├── config/ramp_presets/        # Ramp-Kurven als JSON (editierbar)
-├── docs/
-├── data/
-│   ├── source_100fps/          # Quellmaterial (read-only)
-│   ├── interim/                # Timing-Tabellen, gerenderte Frames, Plots
-│   └── output/                 # Finale MOV-Dateien
-├── src/
-│   ├── ramp_curve.py           # Kurveninterpolation (Smootherstep / Catmull-Rom)
-│   ├── timing_table.py         # Timing-Tabellen-Berechnung (motion_grade / speedramp)
-│   ├── rife_interpolator.py    # RIFE-Wrapper mit Timestep-basiertem Sampling
-│   ├── motion_blur.py          # Sub-Frame-Blur-Compositor
-│   ├── pipeline.py             # CLI-Entry-Point, orchestriert alle Schritte
-│   └── utils/
-│       ├── validation.py       # Automatisierte Plausibilitätsprüfungen
-│       └── ramp_plotting.py    # Verifikations-Plots
-├── notebooks/
-│   └── ramp_verification.ipynb # Interaktiver Testlauf ohne RIFE
-└── third_party/
-    └── practical-rife/         # Submodule / Clone des RIFE-Repos
+blur_window  = (f_source / f_target) * (shutter_angle / 360)
+hold_count   = round(f_source / f_target)   ← kein Shutter-Faktor hier
 ```
+
+**Beispiel:** 25fps mit 180°-Shutter aus 100fps-Material:
+- `blur_window = (100/25) * (180/360) = 2.0` → 2 Quell-Frames werden gefaltet (= 1/50s Belichtung)
+- `hold_count = round(100/25) = 4` → das Composite wird 4× in den Output geschrieben
+
+`blur_window` und `hold_count` sind bewusst entkoppelt: Der Shutter-Winkel steuert nur die Blur-Intensität, nicht die Wiedergabe-Kadenz.
 
 ---
 
-## Requirements & Installation
+## Installation
 
-### Systemvoraussetzungen
+### Voraussetzungen
 
 - Python 3.10+
-- FFmpeg (systemweit installiert, im PATH)
-- NVIDIA-GPU mit CUDA-Support (empfohlen; CPU-Fallback möglich, aber erheblich langsamer)
+- FFmpeg (systemweit, im PATH)
+- NVIDIA-GPU mit CUDA (empfohlen)
 - Practical-RIFE Modell ≥ v4.25
 
-### Installation
+### Schritt für Schritt
 
 ```bash
 # 1. Repository klonen
-git clone https://github.com/[dein-username]/framerate-ramp-pipeline.git
+git clone https://github.com/Simo-de/framerate-ramp-pipeline.git
 cd framerate-ramp-pipeline
 
-# 2. Virtual Environment anlegen
+# 2. Virtual Environment
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# 3. Abhängigkeiten installieren
+# 3. Abhängigkeiten
 pip install -r requirements.txt
 
-# 4. PyTorch mit CUDA installieren (Version passend zur eigenen CUDA-Installation)
-# Siehe: https://pytorch.org/get-started/locally/
+# 4. PyTorch — Version abhängig von lokaler CUDA-Installation
+# GPU (CUDA 12.1):
 pip install torch --index-url https://download.pytorch.org/whl/cu121
+# CPU-only (langsam, aber ohne GPU lauffähig):
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# 5. FFmpeg installieren (falls noch nicht vorhanden)
-# macOS: brew install ffmpeg
-# Windows: https://ffmpeg.org/download.html (Binary in PATH legen)
-
-# 6. Practical-RIFE einrichten
+# 5. Practical-RIFE einrichten
 cd third_party
 git clone https://github.com/hzwer/Practical-RIFE.git practical-rife
-# Modell-Checkpoints (RIFE_HDv3.py + flownet.pkl) aus der Model-Liste
-# des Repos nach third_party/practical-rife/train_log/ kopieren.
-```
-
-`requirements.txt` (Kerndependencies):
-```
-numpy
-scipy
-pandas
-opencv-python
-matplotlib
-tqdm
-pyyaml
+# Modell-Checkpoints (RIFE_HDv3.py + flownet.pkl) aus der Model-Liste des
+# Repos nach third_party/practical-rife/train_log/ kopieren.
 ```
 
 ---
 
-## Schritt-für-Schritt-Nutzung
+## Bedienung — konkretes Beispiel
 
-### 1. Clip exportieren
+Ziel: Ein 4-sekündiger 100fps-Clip soll von 25fps-Charakter auf 100fps-Charakter und zurück gerampt werden, mit klassischem 180°-Film-Shutter als Ausgangspunkt.
 
-Aus dem Schnittprogramm (DaVinci Resolve / Premiere) nur den Abschnitt exportieren, der gerampt werden soll, mit ca. 0,5s Puffer an beiden Enden:
+### Schritt 1: Clip exportieren und ablegen
 
-- Format: QuickTime (.mov), ProRes 4444 oder DNxHR 444
+Exportiere den zu rampenden Abschnitt aus deinem Schnittprogramm:
+- Format: QuickTime `.mov`, ProRes 4444 oder DNxHR 444
 - Framerate: **exakt 100fps** — kein Resampling
-- Kein Grading, kein LUT
+- Kein Grading, kein LUT vorab
 
-### 2. Frames extrahieren
+Lege die Datei hier ab:
+```
+data/source_100fps/clip_001/clip_001.mov
+```
+
+### Schritt 2: Frames extrahieren
 
 ```bash
-# Das Flag -start_number 0 ist zwingend erforderlich.
-# Ohne es beginnt FFmpeg bei frame_000001.png statt frame_000000.png,
-# was die Pipeline mit einem Fehler abbricht (wird automatisch erkannt).
+# Das Flag -start_number 0 ist zwingend — ohne es beginnt FFmpeg bei
+# frame_000001.png statt frame_000000.png, was die Pipeline erkennt
+# und mit einer klaren Fehlermeldung abbricht.
 ffmpeg -i data/source_100fps/clip_001/clip_001.mov \
        -start_number 0 \
        data/source_100fps/clip_001/frames/frame_%06d.png
 ```
 
-### 3. Ramp-Preset definieren
+Aus einem 4-Sekunden-Clip entstehen so 400 Dateien: `frame_000000.png` bis `frame_000399.png`.
 
-Datei in `config/ramp_presets/` anlegen (oder bestehendes Preset verwenden):
+### Schritt 3: Ramp-Preset anlegen
+
+Erstelle `config/ramp_presets/mein_ramp.json`:
 
 ```json
 {
-  "name": "25_100_25_smoothstep",
+  "name": "mein_ramp",
   "source_fps": 100,
   "keyframes": [
     { "time_sec": 0.0, "target_fps": 25 },
     { "time_sec": 1.5, "target_fps": 100 },
-    { "time_sec": 3.0, "target_fps": 100 },
-    { "time_sec": 4.5, "target_fps": 25 }
+    { "time_sec": 2.5, "target_fps": 100 },
+    { "time_sec": 4.0, "target_fps": 25 }
   ],
   "interpolation": "smoothstep",
-  "total_duration_sec": 4.5
+  "total_duration_sec": 4.0
 }
 ```
 
-`target_fps` beschreibt den **simulierten Shutter-Charakter**, nicht eine tatsächliche Framerate-Konvertierung. Der Output läuft immer mit `source_fps` (100fps).
+`target_fps` beschreibt den simulierten **Shutter-Charakter**, nicht eine Framerate-Konvertierung. Der Output-Container läuft immer mit 100fps.
 
-### 4. Pipeline starten
+### Schritt 4: Pipeline starten
 
 ```bash
 python -m src.pipeline \
   --clip clip_001 \
-  --preset 25_100_25_smoothstep \
+  --preset mein_ramp \
   --rife-model-dir third_party/practical-rife/train_log \
-  --mode motion_grade
+  --mode motion_grade \
+  --shutter-angle 180
 ```
 
-Wichtige Flags:
+Die Pipeline läuft jetzt durch:
+1. Frames werden auf Vollständigkeit und korrekten Startindex geprüft
+2. Timing-Table wird berechnet
+3. Verifikations-Plot wird gespeichert (siehe unten)
+4. RIFE rendert die Composites — bei einem 4-Sekunden-Clip ca. 20–40 Minuten (GPU)
+5. FFmpeg fügt alles zu einer ProRes-4444-Datei zusammen
+
+Das fertige Video liegt hier:
+```
+data/output/clip_001_mein_ramp_motion_grade.mov
+```
+
+### Wichtige Flags
 
 | Flag | Bedeutung |
 |---|---|
-| `--mode motion_grade` | Motion Grading, 1× Geschwindigkeit (Default) |
-| `--mode speedramp` |  Zeitlupen-Retiming |
-| `--shutter-angle 360` | Voller Shutter (Default, passend zu 100fps/360°-Quellmaterial) |
-| `--shutter-angle 180` | Look mit weniger Blur |
-| `--max-subsamples 7` | Qualität des Blur-Integrals (mehr = besser, aber langsamer) |
-| `--force` | Vorhandenen Frame-Cache löschen und neu rendern |
-| `--skip-rife` | Nur Validierung und Plot, kein Render (für Kurven-Iteration) |
-
-### 5. Output
-
-Der fertige Clip liegt unter `data/output/clip_001_25_100_25_smoothstep_motion_grade.mov` als ProRes 4444, 100fps, exakt gleich lang wie das Quellmaterial.
+| `--mode motion_grade` | Echtes Motion Grading, 1× Geschwindigkeit (Default) |
+| `--mode speedramp` | Klassisches Zeitlupen-Retiming |
+| `--shutter-angle 180` | Filmischer Look (klassischer 180°-Shutter) |
+| `--shutter-angle 360` | Maximaler Blur (360°, passend zu 100fps-Quellmaterial) |
+| `--max-subsamples 7` | Qualität des Blur-Integrals (mehr = besser, langsamer) |
+| `--force` | Cache löschen und komplett neu rendern |
+| `--skip-rife` | Nur Validierung und Plot, kein Render |
 
 ---
 
-## Validierung & Plausibilitätsprüfung
+## Verifikations-Plot — Leseanleitung
 
-Die Pipeline führt **vor jedem Render-Start** automatisch mehrere Prüfungen durch und erstellt einen Verifikations-Plot unter `data/interim/<clip>/ramp_<preset>/verification_plot.png`.
+Vor jedem Render erzeugt die Pipeline automatisch `verification_plot.png` unter `data/interim/<clip>/ramp_<preset>/`. Er dokumentiert die mathematischen Eigenschaften der Ramp-Kurve.
 
-### Automatisierte Checks (Konsolen-Output)
-
-- **Blur-Fenster-Indexgrenzen:** Stellt sicher, dass kein Sub-Sample-Zeitpunkt außerhalb der extrahierten Quell-Frame-Sequenz liegt.
-- **Glattheit der FPS-Kurve (3. Ableitung / Ruck):** Prüft, ob die Ramp-Kurve tatsächlich stufenlos ist. Ein isolierter Spike in der dritten Ableitung würde eine echte Knick-Stelle signalisieren — visuelle Wahrnehmung als „Ruckeln im Ruckeln" selbst bei einer scheinbar glatten Hauptkurve.
-- **Hold-Frame-Rate:** Informationsausgabe über den Anteil wiederholter Frames (erwartet: ~75% in 25fps-Bereichen, ~0% in 100fps-Bereichen).
-- **Cache-Fingerprint:** Verhindert, dass Frames aus verschiedenen Konfigurationen gemischt werden (z.B. nach einem Parameter-Wechsel ohne `--force`).
-
-### Der Verifikations-Plot — Leseanleitung für den Prüfer
+![Verifikationsplot](docs/verification_plot.png)
 
 Der Plot besteht aus sechs Panels:
 
-**Panel 1 — Frame-Mapping-Kurve**
-X-Achse: Output-Frame-Index (0 bis ~420 bei 4,26s × 100fps).
-Y-Achse: Quell-Frame-Index des Anker-Frames.
-Die blaue Linie sollte auf der grauen 1:1-Diagonalen liegen — das beweist, dass keine Zeitdehnung stattfindet. Die blaue Füllfläche um die Linie zeigt die Blur-Fensterbreite: breit in 25fps-Bereichen (4 Quell-Frames werden gefaltet), schmal in 100fps-Bereichen (fast kein Blur). Weicht die Linie systematisch von der Diagonalen ab, liegt ein Speedramping-Modus-Fehler vor.
+**Frame-Mapping-Kurve**
+Die blaue Linie verläuft exakt auf der grauen 1:1-Diagonalen. Bild 200 im Output entspricht exakt Bild 200 aus dem Quellmaterial. Weicht die Linie systematisch ab, liegt ungewolltes Speedramping vor. Die blaue Füllfläche zeigt die Blur-Fensterbreite: breit in 25fps-Bereichen (mehrere Frames werden gefaltet), schmal in 100fps-Bereichen.
 
-**Panel 2a — Effective Framerate Curve**
-Die Ramp-Kurve selbst: lokale Ziel-FPS über die Zeit. Sollte S-förmig zwischen 25 und 100fps verlaufen, an den Übergangspunkten sanft einsetzen (keine harten Knicke).
+**Ziel-Framerate**
+Die Ramp-Kurve selbst. Sollte S-förmig zwischen 25fps und 100fps verlaufen und an den Übergangspunkten sanft einsetzen 
 
-**Panel 2b — Erste Ableitung (d(fps)/dt)**
-Änderungsrate der Framerate. Zeigt, wie schnell die Rampe steigt/fällt. Muss an den Plateau-Rändern (dort wo `target_fps` konstant 100 ist) gegen Null gehen — das ist die C¹-Stetigkeits-Prüfung.
+**Erste Ableitung**
+Änderungsrate der Framerate. Zeigt, wie schnell die Rampe steigt oder fällt. An den Plateau-Rändern (wo `target_fps` konstant ist) muss sie gegen Null gehen 
 
-**Panel 2c — Zweite Ableitung (d²(fps)/dt²)**
-Die Krümmung der Rampe. Darf betragsmäßig hoch sein (eine steile Rampe ist zwangsläufig stark gekrümmt), muss aber breit und glatt verlaufen ohne abrupte Richtungswechsel. Ein einzelner scharfer Ausschlag würde eine Knick-Stelle in der Kurve signalisieren.
+**Zweite Ableitung**
+Krümmung der Rampe. Darf betragsmäßig hoch sein (eine steile Rampe ist zwangsläufig stark gekrümmt), muss aber breit und glatt verlaufen — ohne abrupte Richtungswechsel. Ein harter Ausschlag würde bedeuten, dass der Übergang für den Zuschauer spürbar ruckelt.
 
-**Panel 2d — Dritte Ableitung / Ruck (d³(fps)/dt³)**
-Dies ist der eigentliche mathematische Stufenlosigkeits-Beweis. Eine stufenlose, C²-stetige Kurve (wie die hier verwendete Quintic Smootherstep) zeigt in der dritten Ableitung einen glatten, wellenförmigen Verlauf ohne isolierte Nadel-Spikes. Rote Punkte würden Stellen markieren, deren Ruck-Amplitude mehr als 25× über dem Median liegt — das wäre eine echte Naht-Diskontinuität. Bei einem korrekten Quintic-Smootherstep-Übergang sollten **keine roten Punkte** erscheinen.
+**Dritte Ableitung**
+Der eigentliche Stufenlosigkeits-Beweis. Ein glatter, wellenförmiger Verlauf ohne isolierte Spikes zeigt, dass keine ungewollten Unstetigkeiten in der Kurve vorliegen. Rote Punkte markieren Stellen, deren Amplitude mehr als 25× über dem Median liegt. Bei einem korrekten Quintic-Smootherstep-Übergang sollten keine roten Punkte erscheinen.
 
-**Panel 3 — Blur-Fenster-Verlauf**
-Zeigt direkt die physikalische Bedeutung der Ramp: Wie viele 100fps-Quell-Frames werden in jeden Output-Frame gefaltet? Die gestrichelte Linie bei 1.0 markiert den 100fps-Charakter (ein Frame pro Output-Frame, kein Blur), die Linie bei 4.0 markiert den 25fps-Charakter (vier Frames, maximaler Blur bei 100fps-Quelle). Der Verlauf sollte exakt der Kurve aus Panel 2a entsprechen — invertiert und skaliert.
+**Blur-Fenster-Verlauf**
+Zeigt direkt, wie viele 100fps-Quellbilder pro Output-Frame gefaltet werden. Die gestrichelte Linie bei 1.0 markiert 100fps-Charakter (kein Blur), die Linie bei 4.0 markiert maximalen 25fps-Charakter bei 360°-Shutter. Bei 180°-Shutter liegt der Maximalwert bei 2.0.
 
 ---
 
-## Bekannte Limitierungen des Proof-of-Concept
+## Architektur
 
-- **Verdeckungskanten:** Sub-Frame-Averaging (Riemann-Summen-Approximation des Shutter-Integrals) behandelt alle Samples gleichgewichtig ohne Kenntnis von Objektverdeckungen. Bei sehr schnellen Bewegungen vor statischem Hintergrund kann leichtes Ghosting an Verdeckungskanten auftreten. Ein vektorbasierter Blur-Node (z.B. Nuke VectorBlur) wäre präziser, aber in dieser Pipeline bewusst zugunsten physikalischer Korrektheit und Implementierungsrobustheit nicht eingesetzt.
-- **Ganzzahliger Hold-Count:** `hold_count` wird auf ganze Zahlen gerundet (Pulldown-Kompromiss). Bei Rampen durch nicht-ganzzahlige fps-Verhältnisse (z.B. 33fps bei 100fps-Quelle) entstehen minimale, mathematisch unvermeidbare Timing-Diskontinuitäten in dritter Ordnung — unterhalb der menschlichen Wahrnehmungsgrenze.
-- **Skalierung:** Bisher nur auf Kurzclips (~4s) getestet. Für längere Szenen aus dem 250-GB-Quellmaterial ist der Export-auf-Häppchen-Workflow vorgesehen (nur Ramp-Abschnitte durch die Pipeline schicken).
+```
+framerate-ramp-pipeline/
+├── config/ramp_presets/     # Ramp-Kurven als JSON (editierbar, kein Code nötig)
+├── data/
+│   ├── source_100fps/       # Quellmaterial und extrahierte Frames (lokal, nicht versioniert)
+│   ├── interim/             # Timing-Tabellen, gerenderte Frames, Plots (lokal)
+│   └── output/              # Fertige MOV-Dateien (lokal)
+├── docs/                    # Dokumentations-Assets für README (versioniert)
+├── src/
+│   ├── ramp_curve.py        # Kurveninterpolation (Smootherstep / Catmull-Rom)
+│   ├── timing_table.py      # Kern-Logik: blur_window und hold_count pro Frame
+│   ├── rife_interpolator.py # Practical-RIFE Wrapper mit Timestep-Sampling
+│   ├── motion_blur.py       # Sub-Frame-Blur-Compositor
+│   ├── pipeline.py          # CLI-Entry-Point
+│   └── utils/
+│       ├── validation.py    # Automatisierte Plausibilitätsprüfungen
+│       └── ramp_plotting.py # Verifikations-Plot
+├── notebooks/
+│   └── ramp_verification.ipynb   # Interaktiver Testlauf ohne RIFE
+└── third_party/
+    └── practical-rife/      # Separates RIFE-Repo (nicht versioniert)
+```
 
+### Generierte Artefakte
 
-## Output Preview & Validierung
+Für jeden Clip legt die Pipeline unter `data/interim/<clip>/ramp_<preset>/` ab:
 
-**Verifikationsplot für das Preset `25_100_25_smoothstep` auf clip_001 (4,26s, 100fps):**
-![Verifikationsplot](docs/verification_plot.png)
-*Panel 1 zeigt die 1:1-Diagonale (konstante Zeitachse). Panel 3 zeigt die Blur-Fensterbreite (4 Quell-Frames bei 25fps-Charakter, 1 Frame bei 100fps-Charakter).*
+`timing_table.csv` — vollständiges Protokoll: für jeden der N Output-Frames ist dokumentiert, welcher Quell-Anker-Frame genutzt wurde, wie breit das Blur-Fenster war, wie oft das Bild wiederholt wurde und ob es ein Hold-Frame ist. Jeder einzelne Output-Frame ist damit auf den Eingabe-Zeitpunkt zurückverfolgbar.
 
+`verification_plot.png` — statischer Qualitätsnachweis der Kurven-Stetigkeitseigenschaften zum Zeitpunkt der Render-Freigabe.
 
-## Literaturgrundlage
+`blur_frames/` — fertig gerenderte PNG-Sequenz vor dem FFmpeg-Reassembly. Bleibt erhalten, damit der Reassembly-Schritt mit anderen Codec-Einstellungen wiederholt werden kann, ohne RIFE erneut zu starten.
 
-- Hoydem, Jan: *Locally Varying Frame Rates for Judder Reduction in High-Dynamic-Range Content*
-- Oberhauser, Leonard: *Implementierung und Evaluation interpolierter Frame Rate Ramps in Abhängigkeit von Kamera- und Objektbewegung im szenischen Film*
-- Huang, Z. et al.: *Real-Time Intermediate Flow Estimation for Video Frame Interpolation* (ECCV 2022) — Grundlage für Practical-RIFE
+`.render_fingerprint.json` — Konfigurationsnachweis. Die Pipeline prüft bei jedem Start, ob der vorhandene Cache mit der aktuellen Konfiguration übereinstimmt. Bei Abweichungen bricht sie mit einer Fehlermeldung ab. `--force` löscht den Cache und startet sauber neu.
 
 ---
 
-*Letzter Stand: 20.06.2026*
+## Warum Quintic Smootherstep?
+
+Die naheliegende Implementierung einer Framerate-Rampe wäre eine lineare Interpolation. Oberhauser (2025) zeigt, dass eine unstetige Änderungsrate an den Einsatz- und Ausstiegspunkten als störendes Ruckeln wahrgenommen wird, selbst wenn die Hauptbewegung flüssig ist.
+
+Eine kubische Smoothstep-Funktion (3x² − 2x³) löst das Problem teilweise: Die Steigung an den Segmenträndern ist Null. Aber beim Übergang von einer ansteigenden Rampe in ein konstantes Plateau entsteht ein Sprung in der *zweiten* Ableitung — subtiler, aber wahrnehmbar.
+
+Die Pipeline verwendet daher die **Quintic Smootherstep** nach Ken Perlin (6x⁵ − 15x⁴ + 10x³). Diese Funktion hat an beiden Segmenträndern sowohl erste als auch zweite Ableitung exakt Null. Nicht nur die Steigung, sondern auch die Krümmung des Übergangs klingt sanft aus. Der praktische Effekt: Die Rampe setzt organisch ein und endet, ohne dass ein klar definierbarer Startpunkt wahrnehmbar wird.
+
+Hoydems Arbeit zu lokal variierenden Frameraten (2021) zeigt ergänzend, dass wahrgenommener Judder nicht allein von der Framerate abhängt, sondern von der Diskrepanz zwischen implizierter Belichtungszeit (codiert durch die Blur-Menge) und tatsächlicher Frame-Haltezeit. Das ist der theoretische Kern dieser Pipeline: Blur-Charakter und Wiedergabe-Kadenz werden als unabhängige Parameter behandelt und getrennt gesteuert.
+
+---
+
+## Bekannte Limitierungen
+
+**Ganzzahliger Hold-Count:** Da Monitore nur ganze Bilder anzeigen können, wird `hold_count` auf eine ganze Zahl gerundet. Bei asymmetrischen Zwischenwerten (z.B. 33fps bei 100fps-Quelle: 100/33 = 3,03 → 3) entstehen minimale Timing-Unregelmäßigkeiten. Ob diese wahrnehmbar sind, ist zu prüfen.
+
+**Sub-Frame-Averaging bei Verdeckungen:** Das Averaging behandelt alle RIFE-Samples gleichgewichtig. Bei schnellen Objektbewegungen vor statischem Hintergrund kann die Sampleanzahl unter Umständen nicht ausreichen, um eine nahtlose Bewegungsunschärfe zu erzeugen. In diesen Randfällen ist leichtes Ghosting möglich.
+
+**Skalierung:** Bisher an Kurzclips getestet. Für den Einsatz auf größerem Material empfiehlt sich ein clip-basierter Workflow: Nur die Ramp-Abschnitte aus dem Schnittprogramm exportieren, durch die Pipeline schicken und wieder in die Mastertimeline integrieren.
+
+---
+
+## Literatur
+
+- Hoydem, Jan: *Locally Varying Frame Rates for Judder Reduction in High-Dynamic-Range Content* (2021)
+- Oberhauser, Leonard: *Implementierung und Evaluation interpolierter Frame Rate Ramps in Abhängigkeit von Kamera- und Objektbewegung im szenischen Film* (2025)
+- Huang, Z. et al.: *Real-Time Intermediate Flow Estimation for Video Frame Interpolation*, ECCV 2022
+
+---
+
+*Letzter Stand: 10.07.2026*

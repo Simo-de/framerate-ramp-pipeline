@@ -317,6 +317,7 @@ def main() -> None:
         source_fps=args.source_fps,
         output_fps=args.output_fps,
         mode=args.mode,
+        shutter_angle=args.shutter_angle,
     )
     timing_df = builder.build(total_duration_sec=total_duration_sec)
     timing_csv_path = interim_dir / "timing_table.csv"

@@ -89,6 +89,9 @@ def plot_effective_framerate(fig: plt.Figure, axes: list[plt.Axes], df: pd.DataF
     t   = work["output_time_sec"].values
     fps = work["local_target_fps"].values
 
+    # Voller Zeitbereich -- als gemeinsames xlim fuer alle Subplots
+    t_min, t_max = float(t[0]), float(t[-1])
+
     dt = np.diff(t)
     dt = np.where(dt == 0, 1e-9, dt)
     first_deriv = np.diff(fps) / dt
@@ -113,17 +116,20 @@ def plot_effective_framerate(fig: plt.Figure, axes: list[plt.Axes], df: pd.DataF
     ax_fps.plot(t, fps, color="#16a34a", linewidth=1.8)
     ax_fps.set_ylabel("lokale Ziel-FPS")
     ax_fps.set_title("Ziel-Framerate")
+    ax_fps.set_xlim(t_min, t_max)
     ax_fps.grid(True, alpha=0.3)
 
     ax_d1.plot(t_first, first_deriv, color="#d97706", linewidth=1.2)
     ax_d1.set_ylabel("d(fps)/dt")
     ax_d1.set_title("Erste Ableitung")
+    ax_d1.set_xlim(t_min, t_max)
     ax_d1.grid(True, alpha=0.3)
     ax_d1.axhline(0, color="#999999", linewidth=0.8)
 
     ax_d2.plot(t_second, second_deriv, color="#dc2626", linewidth=1.0)
     ax_d2.set_ylabel("d²(fps)/dt²")
     ax_d2.set_title("Zweite Ableitung")
+    ax_d2.set_xlim(t_min, t_max)
     ax_d2.grid(True, alpha=0.3)
     ax_d2.axhline(0, color="#999999", linewidth=0.8)
 
@@ -140,6 +146,7 @@ def plot_effective_framerate(fig: plt.Figure, axes: list[plt.Axes], df: pd.DataF
     ax_d3.set_ylabel("d³(fps)/dt³")
     ax_d3.set_xlabel("Output-Zeit (s)")
     ax_d3.set_title("Dritte Ableitung")
+    ax_d3.set_xlim(t_min, t_max)
     ax_d3.grid(True, alpha=0.3)
     ax_d3.axhline(0, color="#999999", linewidth=0.8)
 
@@ -166,6 +173,8 @@ def plot_timestep_sanity(ax: plt.Axes, df: pd.DataFrame) -> None:
         )
     else:
         anchors = _anchor_frames(df)
+        x_min = float(df["output_frame_idx"].min())
+        x_max = float(df["output_frame_idx"].max())
         ax.plot(anchors["output_frame_idx"], anchors["blur_window_frames"],
                 color="#7c3aed", linewidth=1.4)
         ax.axhline(1.0, color="#16a34a", linewidth=0.8, linestyle="--",
@@ -175,6 +184,7 @@ def plot_timestep_sanity(ax: plt.Axes, df: pd.DataFrame) -> None:
         ax.legend(loc="upper right", fontsize=8)
         ax.set_ylabel("Blur-Fensterbreite (Quell-Frames)")
         ax.set_title("Blur-Fenster-Verlauf")
+        ax.set_xlim(x_min, x_max)
         ax.annotate(
             "Breite = Anzahl der in jeden Output-Frame gefalteten Quell-Frames",
             xy=(0.02, 0.92), xycoords="axes fraction", fontsize=8, color="#555555",
@@ -185,14 +195,15 @@ def plot_timestep_sanity(ax: plt.Axes, df: pd.DataFrame) -> None:
 
 
 def build_full_verification_figure(df: pd.DataFrame, title: str = "Ramp-Verifikation") -> plt.Figure:
-    fig = plt.figure(figsize=(11, 16))
+    # Frame-Mapping-Panel auf Professorenfeedback entfernt.
+    # Neues Layout: 5 Panels (Ziel-FPS, d1, d2, d3, Blur-Fenster).
+    fig = plt.figure(figsize=(11, 13))
     fig.suptitle(title, fontsize=14, fontweight="bold")
-    gs = fig.add_gridspec(6, 1, height_ratios=[2, 1.1, 1.1, 1.1, 1.1, 1.5], hspace=0.6)
+    gs = fig.add_gridspec(5, 1, height_ratios=[1.3, 1.1, 1.1, 1.1, 1.6], hspace=0.65)
 
-    plot_frame_mapping(fig.add_subplot(gs[0]), df)
     plot_effective_framerate(fig,
-        [fig.add_subplot(gs[i]) for i in range(1, 5)], df)
-    plot_timestep_sanity(fig.add_subplot(gs[5]), df)
+        [fig.add_subplot(gs[i]) for i in range(0, 4)], df)
+    plot_timestep_sanity(fig.add_subplot(gs[4]), df)
     return fig
 
 

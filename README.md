@@ -1,6 +1,6 @@
 # framerate-ramp-pipeline
 
-Eine Python-Pipeline für **Motion Grading** von 100fps-Filmmaterial: stufenlose Steuerung des Shutter-Charakters bei konstanter Zeitachse.
+Eine Python-Pipeline für **stufenlose Framerate-Rampen** von 100fps-Filmmaterial
 
 HDM Stuttgart — Masterprojekt Cinematography Simon Hans · Betreuer: Jan Fröhlich, Stefan Grandinetti
 
@@ -8,28 +8,17 @@ HDM Stuttgart — Masterprojekt Cinematography Simon Hans · Betreuer: Jan Fröh
 
 ## Transparenzhinweis
 
-Dieses Projekt wurde im Rahmen meines Masterprojekts an der HdM Stuttgart entwickelt. Für die Implementierung der Pipeline — d.h. die Generierung und das iterative Debugging des Python-Codes — habe ich intensiv mit dem Large Language Model Claude (Anthropic, Modell: Claude Sonnet 4.6) zusammengearbeitet. Sämtliche konzeptionellen Entscheidungen (Problemdefinition, Wahl der mathematischen Interpolationsmethode, visuelle Verifikationsstrategie usw.) wurden eigenständig entwickelt und im Dialog mit dem Modell umgesetzt. Der Code wurde in jeder Iteration inhaltlich geprüft und bei Fehlern gezielt korrigiert.
+Dieses Repository ist im Rahmen meines Masterprojekts entstanden. Bei der praktischen Umsetzung – also beim Schreiben, Refaktorieren und Debuggen des Python-Codes – habe ich Claude als Coding-Assistenten genutzt. Das konzeptionelle Fundament, die mathematische Logik und die Lösungsansätze stammen von mir und wurden im iterativen Prozess gemeinsam mit der KI in lauffähigen Code übersetzt.
 
-Dieses Repository dokumentiert einen funktionierenden **Proof-of-Concept** an einem Testclip (~4 Sekunden, 100fps).
+Aktueller Stand: Dieses Repository dokumentiert einen funktionierenden Proof-of-Concept (getestet an nativem 100fps-Material).
 
 ---
 
-## Was dieses Tool tut — und was nicht
+## Kernkonzept
 
-### Speedramping vs. Motion Grading
+Im Gegensatz zum klassischen Speedramping, bei dem sich die Abspielgeschwindigkeit und Clip-Länge ändern, hält diese Pipeline die Zeitachse konstant (1:1). Jeder Output-Frame entspricht exakt dem Zeitpunkt der Originalaufnahme. Die Pipeline rampt ausschließlich den visuellen Charakter (die Abspielkadenz und die Bewegungsunschärfe).
 
-Beim **Speedramping** steuert die Framerate-Kurve gleichzeitig zwei Dinge: die Wiedergabegeschwindigkeit *und* die Anzahl der Quell-Frames, die auf einen Output-Frame abgebildet werden. Ein Ramp von 100fps auf 25fps bedeutet dort, dass die Quellzeit viermal langsamer abläuft. Der Clip dehnt sich auf das Vierfache seiner Dauer.
-
-Beim **Motion Grading** (diese Pipeline) werden beide Aspekte getrennt. Die Zeitachse bleibt konstant bei 1×. Jeder Output-Frame entspricht exakt demselben Zeitpunkt im Quellmaterial. Was sich ändert, ist ausschließlich der Shutter-Charakter: Wie viele Quell-Frames werden zu einem Composite gefaltet, und wie oft wird dieses Bild im 100fps-Container wiederholt?
-
-| | Speedramping | Motion Grading (diese Pipeline) |
-|---|---|---|
-| Zeitachse | gedehnt / gestaucht | konstant 1× |
-| Output-Länge | ändert sich | identisch zum Original |
-| Container-FPS | niedriger (z.B. 25fps) | identisch zur Quelle (100fps) |
-| Effekt | Bewegung langsamer / schneller | Shutter-Charakter ändert sich |
-
-### Die Formel dahinter
+Die zugrunde liegende Mathematik trennt dabei  die Wiedergabe-Kadenz (hold_count) von der Belichtungszeit (blur_window), welche über den Shutter-Winkel gesteuert wird.
 
 Sei `f_target` die lokale Ziel-Framerate, `f_source` die Quell-Framerate (100fps) und `shutter_angle` der gewünschte simulierte Shutter-Winkel in Grad:
 
@@ -52,7 +41,7 @@ hold_count   = round(f_source / f_target)   ← kein Shutter-Faktor hier
 
 - Python 3.10+
 - FFmpeg (systemweit, im PATH)
-- NVIDIA-GPU mit CUDA (empfohlen)
+- NVIDIA-GPU mit CUDA (empfohlen, CPU-Fallback möglich)
 - Practical-RIFE Modell ≥ v4.25
 
 ### Schritt für Schritt
@@ -177,10 +166,7 @@ Vor jedem Render erzeugt die Pipeline automatisch `verification_plot.png` unter 
 
 ![Verifikationsplot](docs/verification_plot.png)
 
-Der Plot besteht aus sechs Panels:
-
-**Frame-Mapping-Kurve**
-Die blaue Linie verläuft exakt auf der grauen 1:1-Diagonalen. Bild 200 im Output entspricht exakt Bild 200 aus dem Quellmaterial. Weicht die Linie systematisch ab, liegt ungewolltes Speedramping vor. Die blaue Füllfläche zeigt die Blur-Fensterbreite: breit in 25fps-Bereichen (mehrere Frames werden gefaltet), schmal in 100fps-Bereichen.
+Der Plot besteht aus fünf Panels:
 
 **Ziel-Framerate**
 Die Ramp-Kurve selbst. Sollte S-förmig zwischen 25fps und 100fps verlaufen und an den Übergangspunkten sanft einsetzen 
@@ -262,10 +248,11 @@ Hoydems Arbeit zu lokal variierenden Frameraten (2021) zeigt ergänzend, dass wa
 
 ## Literatur
 
-- Hoydem, Jan: *Locally Varying Frame Rates for Judder Reduction in High-Dynamic-Range Content* (2021)
-- Oberhauser, Leonard: *Implementierung und Evaluation interpolierter Frame Rate Ramps in Abhängigkeit von Kamera- und Objektbewegung im szenischen Film* (2025)
-- Huang, Z. et al.: *Real-Time Intermediate Flow Estimation for Video Frame Interpolation*, ECCV 2022
+- Hoydem, J. (2020): Locally Varying Frame Rates for Judder Reduction in High-Dynamic-Range Content.
+- Oberhauser, L. (2025): Implementierung und Evaluation interpolierter Frame Rate Ramps in Abhängigkeit von Kamera- und Objektbewegung im szenischen Film.
+- Huang, Z. et al. (2022): Real-Time Intermediate Flow Estimation for Video Frame Interpolation. (ECCV).
+- Perlin, K. (2002). Improving Noise. ACM Transactions on Graphics (TOG), 21(3), 681–682. Abrufbar hier: https://mrl.cs.nyu.edu/~perlin/paper445.pdf
 
 ---
 
-*Letzter Stand: 10.07.2026*
+*Letzter Stand: 21.07.2026*
